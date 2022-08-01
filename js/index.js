@@ -88,7 +88,7 @@ async function loadData(type){
         var years_str = data.columns.slice(19)
         var years_int = getYears(years_str);
         var margin = {top: 10, right: 30, bottom: 30, left: 60};
-        var width = 600 - margin.left - margin.right;
+        var width = 1200 - margin.left - margin.right;
         var height = 600 - margin.top - margin.bottom;
     
         var x = d3.scaleBand().domain(years_str).range([0, width]);
@@ -158,6 +158,7 @@ async function loadData(type){
                 .attr("stroke-width", 8);
 
             animate(x, death_y, annotations, type);
+            
             
             
 
@@ -258,6 +259,24 @@ async function loadData(type){
                 .attr("stroke-width", 8);
 
             animate(x, age_y, annotations, type);
+
+            var legend_keys = ["Under 19", "20-34", "35-49", "50-64", "65+"];
+            var colDict= {"Under 19": "red", "20-34": "yellow", "35-49": "green", "50-64": "blue", "65+": "purple"};
+
+            var lineLegend = svg.selectAll(".lineLegend").data(legend_keys)
+                .enter().append("g")
+                .attr("class","lineLegend")
+                .attr("transform", function (d,i) {
+                    return "translate(" + (margin.left) + "," + (i*20)+")";
+                });         
+
+            lineLegend.append("text").text(function (d) {return d;})
+                .attr("transform", "translate(15, 6)");
+
+            lineLegend.append("rect")
+                .attr("fill", d => colDict[d])
+                .attr("width", 12).attr('height', 5);
+
         } else{
             var gender_data1 = constructData(data[22], years_str);
             var gender_data2 = constructData(data[23], years_str);
@@ -326,8 +345,26 @@ async function loadData(type){
                 .attr("fill", "none")
                 .attr("stroke", "yellow")
                 .attr("stroke-width", 8);;
-                
+
             animate(x, gender_y, annotations, type);
+
+            var legend_keys = ["Male", "Female"]
+            var colDict= {"Male": "red", "Female": "yellow"};
+
+            var lineLegend = svg.selectAll(".lineLegend").data(legend_keys)
+                .enter().append("g")
+                .attr("class","lineLegend")
+                .attr("transform", function (d,i) {
+                    return "translate(" + (margin.left) + "," + (i*20)+")";
+                });         
+
+            lineLegend.append("text").text(function (d) {return d;})
+                .attr("transform", "translate(15, 6)");
+
+            lineLegend.append("rect")
+                .attr("fill", d => colDict[d])
+                .attr("width", 12).attr('height', 5);
+
         }
     });
     
