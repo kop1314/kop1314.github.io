@@ -26,3 +26,7 @@
     border-top: none;
 }
 
+#tooltip {
+    background-color: ghostwhite;
+    color: #3498DB;
+}

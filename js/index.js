@@ -1,18 +1,27 @@
 var margin = {top: 10, right: 30, bottom: 30, left: 60};
 
+const colors = ["red", "yellow", "green", "blue", "purple"];
+const ages= ["Under 19", "20-34", "35-49", "50-64", "65+"];
+const genders = ["Male", "Female"];
+
+
+
 window.onload = function() {
     loadData("death");
 };
-function constructData(row, years) {
-    var new_dict = [];
+function constructData(row, years, category) {
+    var new_dict = {}
+    var history = [];
     for(var year of years) {
         var sub = {};
         sub["Year"] = Number(year);
         sub["Deaths"] = Number(row[year]);
-        new_dict.push(sub);
+        history.push(sub);
         
     }
     //console.log(new_dict);
+    new_dict["category"] = category;
+    new_dict["history"] = history;
     return new_dict;
 }
 
@@ -26,9 +35,9 @@ function getYears(years) {
 
 function animate(x, y, annotations, type) {
     d3.selectAll(".line").each(function(d, i) {
-        console.log(d3.select("#line" + (i+1)).node());
-        var totalLength = d3.select("#line" + (i+1)).node().getTotalLength();
-        d3.selectAll("#line" + (i+1))
+        console.log(d3.select("#line" + i).node());
+        var totalLength = d3.select("#line" + i).node().getTotalLength();
+        d3.selectAll("#line" + i)
         .attr("stroke-dasharray", totalLength + " " + totalLength)
         .attr("stroke-dashoffset", totalLength)
         .transition()
@@ -74,10 +83,16 @@ function showAnnotataion(x, y, annotations) {
                 .call(makeAnnotations);
 }
 
+function removeTooltip(tooltip, tooltipLine) {
+    if (tooltip) tooltip.style('display', 'none');
+    if (tooltipLine) tooltipLine.attr('stroke', 'none');
+}
+
+
 async function loadData(type){
     var data = await d3.csv("https://a.usafacts.org/api/v4/Metrics/csv/113346?&_ga=2.110233733.1205394869.1659282928-510300506.1659282928")
     .then(function (data) {
-        
+        console.log(data);
         var pre_svg =  d3.selectAll("svg");
         if(!pre_svg.empty() && pre_svg.attr('id') === type){
             return;
@@ -86,12 +101,22 @@ async function loadData(type){
         d3.selectAll("svg").remove();
         //console.log(data.columns.slice(1));
         var years_str = data.columns.slice(19)
+        console.log(years_str)
         var years_int = getYears(years_str);
         var margin = {top: 10, right: 30, bottom: 30, left: 60};
         var width = 1200 - margin.left - margin.right;
         var height = 600 - margin.top - margin.bottom;
     
-        var x = d3.scaleBand().domain(years_str).range([0, width]);
+        var svg = d3.select(".chart")
+            .append("svg")
+                .attr("id", type)
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)                .append("g")
+                .attr("transform",
+                        "translate(" + margin.left + "," + margin.top + ")");
+
+
+        var x = d3.scalePoint().domain(years_str).range([0, width]);
         
     
         var death_y = d3.scaleLinear().domain([25000, 50000]).range([height, 0]);
@@ -100,7 +125,11 @@ async function loadData(type){
 
 
         if(type === "death"){
-            var death_data = constructData(data[0], years_str);
+            var death_data = []
+            for(let row  = 0; row <1; row++){
+                death_data.push(constructData(data[row], years_str, "total"));
+            }
+            console.log(death_data);
 
             var annotations = [{
                 note: {
@@ -131,15 +160,6 @@ async function loadData(type){
                 .y(d => death_y(d.Deaths));
 
             
-            var svg = d3.select(".chart")
-                .append("svg")
-                    .attr("id", "death")
-                    .attr("width", width + margin.left + margin.right)
-                    .attr("height", height + margin.top + margin.bottom)
-                .append("g")
-                    .attr("transform",
-                          "translate(" + margin.left + "," + margin.top + ")");
-            
             svg.append("g")
                 .attr("class", "x-axis")
                 .attr("transform", "translate(0, "+height+")")
@@ -149,10 +169,14 @@ async function loadData(type){
                 .attr("class", "y-axis")
                 .call(d3.axisLeft(death_y)
                             .tickValues([25000, 30000, 35000, 40000, 45000, 50000]));
-            svg.append("path")
-                .attr("id", "line1")
+            svg.selectAll()
+                .data(death_data)
+                .enter()
+                .append("path")
+                .attr("id", function(d, i) {return "line" + i;})
                 .attr("class", "line")
-                .attr("d", line(death_data))
+                .datum(d => d.history)
+                .attr("d", line)
                 .attr("fill", "none")
                 .attr("stroke", "red")
                 .attr("stroke-width", 8);
@@ -160,16 +184,50 @@ async function loadData(type){
             animate(x, death_y, annotations, type);
             
             
+            var tooltip = d3.select("#tooltip");
+            var tooltipLine = svg.append("line");
+
+            var tipBox = svg.append("rect")
+                .attr('width', width)
+                .attr('height', height)
+                .attr('opacity', 0)
+                .on('mousemove', drawTooltip)
+                .on('mouseout', removeTooltip(tooltip, tooltipLine));
             
+            
+            function drawTooltip() {
+                    //console.log(d3.mouse(d3.select("svg").selectAll("rect").nodes()[0])[0])
+            
+                var year = years_str[Math.floor(d3.mouse(tipBox.node())[0]/x.step())];
+                console.log(year);
+        
+                tooltipLine.attr('stroke', 'black')
+                    .attr('x1', x(year))
+                    .attr('x2', x(year))
+                    .attr('y1', 0)
+                    .attr('y2', height);
+                        
+                tooltip.html(year)
+                    .style('display', 'block')
+                    .style('left', d3.event.pageX+"px")
+                    .style('top', (d3.event.pageY + 30)+"px")
+                    .selectAll()
+                    .data(death_data)
+                    .enter()
+                    .append('div')
+                    .style('color', function(d, i){return colors[i];})
+                    .html(d => d.category + ': ' + d.history.find(h => h.Year == year).Deaths);
+            }
 
         } else if(type === "age"){
-            var age_data1 = constructData(data[8], years_str);
-            var age_data2 = constructData(data[9], years_str);
-            var age_data3 = constructData(data[10], years_str);
-            var age_data4 = constructData(data[11], years_str);
-            var age_data5 = constructData(data[12], years_str);
-            console.log(age_data1);
-            console.log(age_data2);
+
+            var age_data = []
+            for(let row  = 8; row <13; row++){
+                age_data.push(constructData(data[row], years_str, ages[row-8]));
+            }
+            console.log(age_data);
+
+
 
             var annotations = [{
                 note: {
@@ -200,14 +258,7 @@ async function loadData(type){
                 .x(d =>  x(d.Year))
                 .y(d => age_y(d.Deaths));
 
-            var svg = d3.select(".chart")
-                .append("svg")
-                    .attr("id", "age")
-                    .attr("width", width + margin.left + margin.right)
-                    .attr("height", height + margin.top + margin.bottom)
-                .append("g")
-                    .attr("transform",
-                          "translate(" + margin.left + "," + margin.top + ")");
+            
                 //.data(death_data)
                 //.enter()
             
@@ -220,44 +271,19 @@ async function loadData(type){
                 .attr("class", "y-axis")
                 .call(d3.axisLeft(age_y)
                             .tickValues([0, 5000, 10000, 15000, 20000]));
-            svg.append("path")
+            svg.selectAll()
+                .data(age_data)
+                .enter()
+                .append("path")
                 .attr("class", "line")
-                .attr("id", "line1")
-                .attr("d", line(age_data1))
+                .attr("id", function(d, i) {return "line" + i;})
+                .datum(d => d.history)
+                .attr("d", line)
                 .attr("fill", "none")
-                .attr("stroke", "red")
+                .attr("stroke", function(d, i) { return colors[i];})
                 .attr("stroke-width", 8);
 
-
-            svg.append("path")
-                .attr("class", "line")
-                .attr("id", "line2")
-                .attr("d", line(age_data2))
-                .attr("fill", "none")
-                .attr("stroke", "yellow")
-                .attr("stroke-width", 8);
-            svg.append("path")
-                .attr("class", "line")
-                .attr("id", "line3")
-                .attr("d", line(age_data3))
-                .attr("fill", "none")
-                .attr("stroke", "green")
-                .attr("stroke-width", 8);
-            svg.append("path")
-                .attr("class", "line")
-                .attr("id", "line4")
-                .attr("d", line(age_data4))
-                .attr("fill", "none")
-                .attr("stroke", "blue")
-                .attr("stroke-width", 8);
-            svg.append("path")
-                .attr("class", "line")
-                .attr("id", "line5")
-                .attr("d", line(age_data5))
-                .attr("fill", "none")
-                .attr("stroke", "purple")
-                .attr("stroke-width", 8);
-
+            
             animate(x, age_y, annotations, type);
 
             var legend_keys = ["Under 19", "20-34", "35-49", "50-64", "65+"];
@@ -276,12 +302,49 @@ async function loadData(type){
             lineLegend.append("rect")
                 .attr("fill", d => colDict[d])
                 .attr("width", 12).attr('height', 5);
-
+            
+            var tooltip = d3.select("#tooltip");
+            var tooltipLine = svg.append("line");
+    
+            var tipBox = svg.append("rect")
+                    .attr('width', width)
+                    .attr('height', height)
+                    .attr('opacity', 0)
+                    .on('mousemove', drawTooltip)
+                    .on('mouseout', removeTooltip(tooltip, tooltipLine));
+            
+            function drawTooltip() {
+                        //console.log(d3.mouse(d3.select("svg").selectAll("rect").nodes()[0])[0])
+                
+                var year = years_str[Math.floor(d3.mouse(tipBox.node())[0]/x.step())];
+                console.log(year);
+            
+                tooltipLine.attr('stroke', 'black')
+                    .attr('x1', x(year))
+                    .attr('x2', x(year))
+                    .attr('y1', 0)
+                    .attr('y2', height);
+                            
+                tooltip.html(year)
+                    .style('display', 'block')
+                    .style('left', d3.event.pageX+"px")
+                    .style('top', (d3.event.pageY + 30)+"px")
+                    .selectAll()
+                    .data(age_data)
+                    .enter()
+                    .append('div')
+                    .style('color', function(d, i){return colors[i];})
+                    .html(d => d.category + ': ' + d.history.find(h => h.Year == year).Deaths);
+                }
         } else{
-            var gender_data1 = constructData(data[22], years_str);
-            var gender_data2 = constructData(data[23], years_str);
-            console.log(gender_data1);
-            console.log(gender_data2);
+
+            var gender_data = []
+            for(let row  = 22; row <24; row++){
+                gender_data.push(constructData(data[row], years_str, genders[row-22]));
+            }
+            console.log(gender_data);
+
+            
 
             var annotations = [{
                 note: {
@@ -312,15 +375,6 @@ async function loadData(type){
                 .x(d =>  x(d.Year))
                 .y(d => gender_y(d.Deaths));
 
-            var svg = d3.select(".chart")
-                .append("svg")
-                    .attr("id", "gender")
-                    .attr("width", width + margin.left + margin.right)
-                    .attr("height", height + margin.top + margin.bottom)
-                .append("g")
-                    .attr("transform",
-                          "translate(" + margin.left + "," + margin.top + ")");
-            
             svg.append("g")
                 .attr("class", "x-axis")
                 .attr("transform", "translate(0, "+height+")")
@@ -330,21 +384,17 @@ async function loadData(type){
                 .attr("class", "y-axis")
                 .call(d3.axisLeft(gender_y)
                             .tickValues([0, 5000, 10000, 15000, 20000, 25000, 30000, 35000]));
-            svg.append("path")
+            svg.selectAll()
+                .data(gender_data)
+                .enter()
+                .append("path")
                 .attr("class", "line")
-                .attr("id", "line1")
-                .attr("d", line(gender_data1))
+                .attr("id", function(d, i) {return "line" + i;})
+                .datum(d => d.history)
+                .attr("d", line)
                 .attr("fill", "none")
-                .attr("stroke", "red")
-                .attr("stroke-width", 8);;
-          
-            svg.append("path")
-                .attr("class", "line")
-                .attr("id", "line2")
-                .attr("d", line(gender_data2))
-                .attr("fill", "none")
-                .attr("stroke", "yellow")
-                .attr("stroke-width", 8);;
+                .attr("stroke", function(d, i) { return colors[i];})
+                .attr("stroke-width", 8);
 
             animate(x, gender_y, annotations, type);
 
@@ -364,8 +414,65 @@ async function loadData(type){
             lineLegend.append("rect")
                 .attr("fill", d => colDict[d])
                 .attr("width", 12).attr('height', 5);
-
+            var tooltip = d3.select("#tooltip");
+            var tooltipLine = svg.append("line");
+    
+            var tipBox = svg.append("rect")
+                    .attr('width', width)
+                    .attr('height', height)
+                    .attr('opacity', 0)
+                    .on('mousemove', drawTooltip)
+                    .on('mouseout', removeTooltip(tooltip, tooltipLine));
+            function drawTooltip() {
+                        //console.log(d3.mouse(d3.select("svg").selectAll("rect").nodes()[0])[0])
+            
+                var year = years_str[Math.floor(d3.mouse(tipBox.node())[0]/x.step())];
+                console.log(year);
+            
+                tooltipLine.attr('stroke', 'black')
+                    .attr('x1', x(year))
+                    .attr('x2', x(year))
+                    .attr('y1', 0)
+                    .attr('y2', height);
+                            
+                tooltip.html(year)
+                    .style('display', 'block')
+                    .style('left', d3.event.pageX+"px")
+                    .style('top', (d3.event.pageY + 30)+"px")
+                    .selectAll()
+                    .data(gender_data)
+                    .enter()
+                    .append('div')
+                    .style('color', function(d, i){return colors[i];})
+                    .html(d => d.category + ': ' + d.history.find(h => h.Year == year).Deaths);
+            }
         }
+
+        /*
+        function drawTooltip(data) {
+            //console.log(d3.mouse(d3.select("svg").selectAll("rect").nodes()[0])[0])
+            var year = years_str[Math.floor(d3.mouse(d3.select("svg").selectAll("rect").nodes()[0])[0]/x.step())];
+            console.log(year);
+
+            tooltipLine.attr('stroke', 'black')
+                
+                .attr('x1', x(year))
+                .attr('x2', x(year))
+                .attr('y1', 0)
+                .attr('y2', height);
+                
+            tooltip.html(year)
+                .style('display', 'block')
+                .style('left', d3.event.pageX+"px")
+                .style('top', (d3.event.pageY + 30)+"px")
+                .selectAll()
+                .data(data)
+                .enter()
+                .append('div')
+                .style('color', function(d, i){return colors[i];})
+                .html(d => d.category + ': ' + d.history.find(h => h.Year == year).Deaths);
+        }
+        */
     });
     
     
