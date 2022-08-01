@@ -1,6 +1,6 @@
 var margin = {top: 10, right: 30, bottom: 30, left: 60};
 
-const colors = ["red", "yellow", "green", "blue", "purple"];
+const colors = ["red", "orange", "green", "blue", "purple"];
 const ages= ["Under 19", "20-34", "35-49", "50-64", "65+"];
 const genders = ["Male", "Female"];
 
@@ -287,7 +287,7 @@ async function loadData(type){
             animate(x, age_y, annotations, type);
 
             var legend_keys = ["Under 19", "20-34", "35-49", "50-64", "65+"];
-            var colDict= {"Under 19": "red", "20-34": "yellow", "35-49": "green", "50-64": "blue", "65+": "purple"};
+            var colDict= {"Under 19": "red", "20-34": "orange", "35-49": "green", "50-64": "blue", "65+": "purple"};
 
             var lineLegend = svg.selectAll(".lineLegend").data(legend_keys)
                 .enter().append("g")
